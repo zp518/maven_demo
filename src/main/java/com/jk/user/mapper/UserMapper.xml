@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.jk.user.mapper.UserMapper" >
+  <resultMap id="BaseResultMap" type="com.jk.user.model.User" >
+    <id column="UserID" property="userid" jdbcType="INTEGER" />
+    <result column="UserName" property="username" jdbcType="VARCHAR" />
+    <result column="Password" property="password" jdbcType="VARCHAR" />
+    <result column="UserDspName" property="userdspname" jdbcType="VARCHAR" />
+    <result column="Sex" property="sex" jdbcType="VARCHAR" />
+    <result column="Birthday" property="birthday" jdbcType="DATE" />
+    <result column="Phone" property="phone" jdbcType="VARCHAR" />
+    <result column="userRoles" property="userRoles" jdbcType="INTEGER" />
+  </resultMap>
+  <sql id="Base_Column_List" >
+    UserID, UserName, Password, UserDspName, Sex, Birthday, Phone
+  </sql>
+  
+  <sql id="userWhere">
+     <where>
+        us.UserID = usro.UserID AND usro.RoleID = ro.RoleID AND ro.RoleID = roper.RoleID 
+		AND roper.PermissionID = per.PermissionId
+     </where>
+  </sql>
+  <select id="selCount" resultType="int" parameterType="com.jk.user.model.User" >
+    select count(us.UserID) 
+    FROM jk_users us 
+    <!-- <include refid="userWhere"></include> -->
+  </select>
+  <select id="selList" resultMap="BaseResultMap" parameterType="com.jk.user.model.User" >
+    select  us.<include refid="Base_Column_List" />
+    FROM jk_users us
+     limit #{startPos},#{stopPos}
+  </select>
+  <select id="selUserOne" resultMap="BaseResultMap" parameterType="com.jk.user.model.User" >
+    select  us.<include refid="Base_Column_List" />
+    FROM jk_users us
+  </select>
+  <!-- 登录 -->
+  <select id="Login" resultMap="BaseResultMap"  parameterType="java.lang.String">
+    select  <include refid="Base_Column_List" />
+    FROM jk_users where UserName=#{userName}
+  </select>
+  
+  <!-- 根据用户ID查询用户拥有的角色 具体的权利 -->
+  <select id="selUserRoles" resultMap="BaseResultMap" parameterType="int" >
+    SELECT  us.<include refid="Base_Column_List" />,r.RoleID AS userRoles,r.Description AS depName
+    FROM jk_users us,jk_userroles ur,jk_roles r WHERE  us.UserID = ur.UserID AND ur.RoleID=r.RoleID AND ur.userId=#{id}
+  </select>
+  <!-- 根据用户ID查询用户拥有的角色 -->
+   <select id="getRoles" resultMap="BaseResultMap" parameterType="int" >
+    select  us.<include refid="Base_Column_List" />,ur.RoleID as userRoles
+    FROM jk_users us,jk_userroles ur where  us.UserID = ur.UserID and ur.userId=#{id}
+  </select> 
+  <!-- 根据角色ID查询角色拥有的权利 -->
+  <select id="getPower" resultType="com.jk.user.model.Roles" parameterType="int" >
+    select ur.RoleID as roleid,ur.Description as description,t.power_id as powerId
+    FROM jk_roles ur,jk_rolepermissions t where  ur.RoleID = t.RoleID and t.RoleID=#{id}
+  </select>
+  <!-- 查询角色总数 -->
+  <select id="selRolesCount" resultType="int">
+   select count(1) from jk_roles
+  </select>
+  
+  <!-- 查询角色表下拉列表-->
+  <select id="selRolesChange" resultType="com.jk.user.model.Roles">
+   select RoleID as roleid,Description as description from jk_roles 
+  </select>
+  <!-- 查询角色表 -->
+  <select id="selRoles" resultType="com.jk.user.model.Roles">
+   select RoleID as roleid,Description as description from jk_roles  limit #{startPos},#{stopPos}
+  </select>
+  
+    <!-- 查询权利表 ztree -->
+  <select id="selZtree" resultType="com.jk.user.model.Power">
+   SELECT p.power_id as powerId ,p.p_name as pname,p.p_uri as puri,p.parent as parent FROM t_power p
+  </select>
+    <!-- 查询权利表 ztree -->
+  <select id="selPowerChange" resultType="com.jk.user.model.Power" parameterType="int" >
+   SELECT p.power_id as powerId ,p.p_name as pname,p.p_uri as puri,p.parent as parent FROM t_power p,jk_rolepermissions r WHERE p.power_id=r.power_id AND r.RoleID=#{id} 
+  </select>
+<!-- 查询权利表 ztree 根据角色查询对应的权利-->
+  <select id="powerSel" resultType="com.jk.user.model.Power" parameterType="java.util.List"  >
+     SELECT p.power_id as powerId ,p.p_name as pname,p.p_uri as puri,p.parent as parent FROM t_power p,jk_rolepermissions r WHERE p.power_id=r.power_id AND r.RoleID in 
+     <foreach collection="list" item="id" open="(" close=")" separator="," >  
+	       #{id}
+    </foreach> 
+  </select>
+   <!-- 删除角色的权限 -->
+   <delete id="delPower" parameterType="java.lang.Integer" >
+    delete from jk_rolepermissions
+    where RoleID = #{id}
+  </delete>
+ 	<!-- 删除用户的角色 -->
+   <delete id="delRoles" parameterType="java.lang.Integer" >
+    delete from jk_userroles
+    where UserID = #{id}
+  </delete>
+  <!-- 新增用户角色 -->
+  <insert id="updateRoles">
+    insert into jk_userroles (UserID, RoleID)
+    values 
+	 <foreach collection="list" item="roleid" separator="," >  
+	       (#{id},#{roleid})  
+    </foreach> 
+  </insert>
+  <!-- 新增角色权限 -->
+  <insert id="updatePower">
+    insert into jk_rolepermissions (RoleID, power_id)
+    values 
+	 <foreach collection="list" item="power_id" separator="," >  
+	       (#{id},#{power_id})  
+    </foreach> 
+  </insert>
+  
+  <!-- 查询个人信息的全部信息 -->
+  <select id="selUserOneById" resultType="com.jk.user.model.User" parameterType="java.lang.Integer">
+  		SELECT  us.*,r.Description as depName,r.RoleID as userRoles FROM jk_users us,jk_userroles ur,jk_roles r WHERE ur.`RoleID`=r.`RoleID` AND ur.`UserID`=us.`UserID` AND us.`UserID`=#{id} 
+  </select>
+  <!-- 更新个人信息 -->
+  <update id="saveUserById" parameterType="com.jk.user.model.User">
+  	  UPDATE jk_users SET UserName = #{username},UserDspName = #{userdspname},
+  	  Sex = #{sex},Phone = #{phone} WHERE UserId = #{userid}
+  </update>
+  
+  <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer" >
+    select 
+    <include refid="Base_Column_List" />
+    from jk_users
+    where UserID = #{userid,jdbcType=INTEGER}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer" >
+    delete from jk_users
+    where UserID = #{userid,jdbcType=INTEGER}
+  </delete>
+  <insert id="insert" parameterType="com.jk.user.model.User" >
+    insert into jk_users (UserID, UserName, Password, 
+      UserDspName, Sex, Birthday, 
+      Phone)
+    values (#{userid,jdbcType=INTEGER}, #{username,jdbcType=VARCHAR}, #{password,jdbcType=VARCHAR}, 
+      #{userdspname,jdbcType=VARCHAR}, #{sex,jdbcType=VARCHAR}, #{birthday,jdbcType=DATE}, 
+      #{phone,jdbcType=VARCHAR})
+  </insert>
+  <insert id="insertSelective" parameterType="com.jk.user.model.User" >
+    insert into jk_users
+    <trim prefix="(" suffix=")" suffixOverrides="," >
+      <if test="userid != null" >
+        UserID,
+      </if>
+      <if test="username != null" >
+        UserName,
+      </if>
+      <if test="password != null" >
+        Password,
+      </if>
+      <if test="userdspname != null" >
+        UserDspName,
+      </if>
+      <if test="sex != null" >
+        Sex,
+      </if>
+      <if test="birthday != null" >
+        Birthday,
+      </if>
+      <if test="phone != null" >
+        Phone,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides="," >
+      <if test="userid != null" >
+        #{userid,jdbcType=INTEGER},
+      </if>
+      <if test="username != null" >
+        #{username,jdbcType=VARCHAR},
+      </if>
+      <if test="password != null" >
+        #{password,jdbcType=VARCHAR},
+      </if>
+      <if test="userdspname != null" >
+        #{userdspname,jdbcType=VARCHAR},
+      </if>
+      <if test="sex != null" >
+        #{sex,jdbcType=VARCHAR},
+      </if>
+      <if test="birthday != null" >
+        #{birthday,jdbcType=DATE},
+      </if>
+      <if test="phone != null" >
+        #{phone,jdbcType=VARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.jk.user.model.User" >
+    update jk_users
+    <set >
+      <if test="username != null" >
+        UserName = #{username,jdbcType=VARCHAR},
+      </if>
+      <if test="password != null" >
+        Password = #{password,jdbcType=VARCHAR},
+      </if>
+      <if test="userdspname != null" >
+        UserDspName = #{userdspname,jdbcType=VARCHAR},
+      </if>
+      <if test="sex != null" >
+        Sex = #{sex,jdbcType=VARCHAR},
+      </if>
+      <if test="birthday != null" >
+        Birthday = #{birthday,jdbcType=DATE},
+      </if>
+      <if test="phone != null" >
+        Phone = #{phone,jdbcType=VARCHAR},
+      </if>
+    </set>
+    where UserID = #{userid,jdbcType=INTEGER}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.jk.user.model.User" >
+    update jk_users
+    set UserName = #{username,jdbcType=VARCHAR},
+      Password = #{password,jdbcType=VARCHAR},
+      UserDspName = #{userdspname,jdbcType=VARCHAR},
+      Sex = #{sex,jdbcType=VARCHAR},
+      Birthday = #{birthday,jdbcType=DATE},
+      Phone = #{phone,jdbcType=VARCHAR}
+    where UserID = #{userid,jdbcType=INTEGER}
+  </update>
+</mapper>
